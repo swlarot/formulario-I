@@ -1,0 +1,186 @@
+﻿@page "/"
+@page "/conocimiento-cliente"
+@using FormularioL.Models
+@using FormularioL.Services
+@inject IEmailService EmailSvc
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Conocimiento del Cliente</h5>
+                </div>
+
+                <div class="card-body">
+                    <EditForm FormName="ConocimientoCliente" Model="@Modelo" OnValidSubmit="Enviar">
+                        <AntiforgeryToken />
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <!-- Honeypot anti-bot (no visible) -->
+                        <input style="display:none" autocomplete="off" @bind="Modelo.CodigoInterno" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del P.H.</label>
+                            <InputText class="form-control" @bind-Value="Modelo.NombrePH" />
+                            <ValidationMessage For="@(() => Modelo.NombrePH)" />
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">RUC</label>
+                                <InputText class="form-control" @bind-Value="Modelo.RUC" />
+                                <ValidationMessage For="@(() => Modelo.RUC)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">DV</label>
+                                <InputText class="form-control" @bind-Value="Modelo.DV" />
+                                <ValidationMessage For="@(() => Modelo.DV)" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Correo para envío de propuesta</label>
+                            <InputText type="email" class="form-control" @bind-Value="Modelo.CorreoPropuesta" />
+                            <ValidationMessage For="@(() => Modelo.CorreoPropuesta)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Dirección física del P.H.</label>
+                            <InputTextArea class="form-control" @bind-Value="Modelo.Direccion" rows="2" />
+                            <ValidationMessage For="@(() => Modelo.Direccion)" />
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Unidades inmobiliarias</label>
+                                <InputNumber class="form-control" @bind-Value="Modelo.Unidades" inputmode="numeric" />
+                                <ValidationMessage For="@(() => Modelo.Unidades)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Torres</label>
+                                <InputNumber class="form-control" @bind-Value="Modelo.Torres" inputmode="numeric" />
+                                <ValidationMessage For="@(() => Modelo.Torres)" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-0">
+                            <div class="col-md-6">
+                                <label class="form-label">Cuota mantenimiento (USD/mes)</label>
+                                <InputNumber class="form-control" @bind-Value="Modelo.CuotaMantenimientoMes" />
+                                <ValidationMessage For="@(() => Modelo.CuotaMantenimientoMes)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gastos mantenimiento (USD/mes)</label>
+                                <InputNumber class="form-control" @bind-Value="Modelo.GastosMantenimientoMes" />
+                                <ValidationMessage For="@(() => Modelo.GastosMantenimientoMes)" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-0">
+                            <div class="col-md-4">
+                                <label class="form-label">Empleados de planilla</label>
+                                <InputNumber class="form-control" @bind-Value="Modelo.EmpleadosPlanilla" />
+                                <ValidationMessage For="@(() => Modelo.EmpleadosPlanilla)" />
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="Modelo.ManejaHorasExtras" />
+                                    <label class="form-check-label ms-1">¿Manejan horas extras?</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="Modelo.HayPromotora" />
+                                    <label class="form-check-label ms-1">¿Hay promotora en el P.H.?</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 mt-2">
+                            <label class="form-label">Sistema contable</label>
+                            <InputText class="form-control" @bind-Value="Modelo.SistemaContable" />
+                            <ValidationMessage For="@(() => Modelo.SistemaContable)" />
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input" @bind-Value="Modelo.EEFFAuditados" />
+                            <label class="form-check-label ms-1">EEFF auditados (año previo)</label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Contacto responsable (nombre y teléfono)</label>
+                            <InputTextArea class="form-control" @bind-Value="Modelo.Contacto" rows="2" />
+                            <ValidationMessage For="@(() => Modelo.Contacto)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notas (no incluir contraseñas)</label>
+                            <InputTextArea class="form-control" @bind-Value="Modelo.Notas" rows="2" />
+                        </div>
+
+                        <!-- Consentimiento obligatorio -->
+                        <div class="form-check mb-3">
+                            <InputCheckbox class="form-check-input" @bind-Value="Modelo.AceptaPrivacidad" />
+                            <label class="form-check-label ms-1">
+                                Acepto el uso de esta información para elaborar la propuesta. No enviaré contraseñas por este medio.
+                            </label>
+                            <ValidationMessage For="@(() => Modelo.AceptaPrivacidad)" />
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" disabled="@(Enviando)">
+                                @if (Enviando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Enviando…</span>
+                                }
+                                else
+                                {
+
+                                    <span>Enviar</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+
+                    @if (ErrorMsg is not null)
+                    {
+                        <div class="alert alert-danger mt-3">@ErrorMsg</div>
+                    }
+                    @if (EnviadoOk)
+                    {
+                        <div class="alert alert-success mt-3 mb-0">
+                            ¡Enviado! Revisaremos tu información.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ConocimientoClienteModel Modelo = new();
+    private bool EnviadoOk;
+    private string? ErrorMsg;
+    private bool Enviando;
+
+    private async Task Enviar()
+    {
+        try
+        {
+            Enviando = true; ErrorMsg = null; EnviadoOk = false;
+            await EmailSvc.SendConocimientoClienteAsync(Modelo);
+            EnviadoOk = true;
+            Modelo = new();  // limpiar
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = "No pudimos enviar el formulario. Intenta nuevamente o escríbenos a ayuda@clau.com.pa.";
+            Console.Error.WriteLine(ex);
+        }
+        finally { Enviando = false; StateHasChanged(); }
+    }
+}
