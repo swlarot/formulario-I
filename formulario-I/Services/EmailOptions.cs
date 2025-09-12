@@ -1,17 +1,17 @@
 ﻿namespace FormularioL.Services;
 
-public record EmailOptions
+public sealed class EmailOptions
 {
-    public SmtpOptions Smtp { get; init; } = new();
-    public string From { get; init; } = "";
-    public string To { get; init; } = ""; // ayuda@clau.com.pa
+    public string? From { get; set; }          // remitente (suele ser igual al User)
+    public string? To { get; set; }            // destino: ayuda@clau.com.pa
+    public SmtpOptions Smtp { get; set; } = new();
 
-    public record SmtpOptions
+    public sealed class SmtpOptions
     {
-        public string Host { get; init; } = "";
-        public int Port { get; init; } = 587;
-        public string User { get; init; } = "";
-        public string Password { get; init; } = "";
-        public bool UseStartTls { get; init; } = true;
+        public string Host { get; set; } = ""; // p.ej. "mail.tudominio.com"
+        public int Port { get; set; } = 587;   // 587(StartTLS) o 465(SSL)
+        public string? User { get; set; }      // p.ej. "no-reply@tudominio.com"
+        public string? Password { get; set; }  // en Secrets/Variables
+        public bool UseStartTls { get; set; } = true; // true=587(StartTLS). Para 465 pon false.
     }
 }

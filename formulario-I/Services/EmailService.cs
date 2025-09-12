@@ -1,63 +1,106 @@
-﻿namespace FormularioL.Services;
-
-using FormularioL.Models;
-using MailKit.Net.Smtp;
+﻿using MailKit.Net.Smtp;
 using MailKit.Security;
-using MimeKit;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text.RegularExpressions;
+using MimeKit;
 
-public class EmailService : IEmailService
+namespace FormularioL.Services;
+
+public sealed class EmailService : IEmailService
 {
     private readonly EmailOptions _opt;
-    public EmailService(IOptions<EmailOptions> options) => _opt = options.Value;
+    private readonly ILogger<EmailService> _log;
 
-    public async Task SendConocimientoClienteAsync(ConocimientoClienteModel m)
+    public EmailService(IOptions<EmailOptions> opt, ILogger<EmailService> log)
     {
+        _opt = opt.Value;
+        _log = log;
+    }
+
+    public async Task SendConocimientoClienteAsync(Models.ConocimientoClienteModel m)
+    {
+        // Honeypot: si se llenó, ignoramos (probable bot)
+        if (!string.IsNullOrEmpty(m.CodigoInterno))
+        {
+            _log.LogWarning("Formulario descartado por honeypot.");
+            return;
+        }
+
+        // Validaciones mínimas
+        if (string.IsNullOrWhiteSpace(_opt.To))
+            throw new InvalidOperationException("Email:To no está configurado.");
+        if (string.IsNullOrWhiteSpace(_opt.Smtp.Host))
+            throw new InvalidOperationException("Email:Smtp:Host no está configurado.");
+        if (_opt.Smtp.Port <= 0)
+            throw new InvalidOperationException("Email:Smtp:Port inválido.");
+        if (string.IsNullOrWhiteSpace(_opt.Smtp.User))
+            throw new InvalidOperationException("Email:Smtp:User no está configurado.");
+        if (string.IsNullOrWhiteSpace(_opt.Smtp.Password))
+            throw new InvalidOperationException("Email:Smtp:Password no está configurado.");
+
+        var from = _opt.From ?? _opt.Smtp.User; // muchos servidores exigen From==User o mismo dominio
 
         var msg = new MimeMessage();
-        msg.From.Add(MailboxAddress.Parse(_opt.From));
+        msg.From.Add(MailboxAddress.Parse(from));
         msg.To.Add(MailboxAddress.Parse(_opt.To));
-        if (!string.IsNullOrWhiteSpace(m.CorreoPropuesta))
-            msg.Cc.Add(MailboxAddress.Parse(m.CorreoPropuesta));
-        if (!string.IsNullOrEmpty(m.CodigoInterno))
-            return; // probable bot, no enviamos
+        msg.Subject = $"Conocimiento del Cliente - {m.NombrePH}";
 
-        msg.Subject = $"Conocimiento del Cliente – {m.NombrePH}";
+        var body = $@"
+Nombre PH: {m.NombrePH}
+RUC: {m.RUC} - DV: {m.DV}
+Correo propuesta: {m.CorreoPropuesta}
+Dirección: {m.Direccion}
+Unidades: {m.Unidades} | Torres: {m.Torres}
+Cuota USD/mes: {m.CuotaMantenimientoMes} | Gastos USD/mes: {m.GastosMantenimientoMes}
+Empleados planilla: {m.EmpleadosPlanilla} | Horas extras: {m.ManejaHorasExtras}
+Promotora: {m.HayPromotora}
+Sistema contable: {m.SistemaContable}
+EEFF auditados: {m.EEFFAuditados}
+Contacto: {m.Contacto}
+Notas: {m.Notas}
+";
 
-        var html = $@"
-<h2>Conocimiento del Cliente</h2>
-<table border='1' cellpadding='6' cellspacing='0'>
-<tr><td><b>Nombre del P.H.</b></td><td>{m.NombrePH}</td></tr>
-<tr><td><b>RUC</b></td><td>{m.RUC}-{m.DV}</td></tr>
-<tr><td><b>Dirección</b></td><td>{m.Direccion}</td></tr>
-<tr><td><b>Correo propuesta</b></td><td>{m.CorreoPropuesta}</td></tr>
-<tr><td><b>Unidades</b></td><td>{m.Unidades}</td></tr>
-<tr><td><b>Torres</b></td><td>{m.Torres}</td></tr>
-<tr><td><b>Cuota mant. (USD/mes)</b></td><td>{m.CuotaMantenimientoMes}</td></tr>
-<tr><td><b>Gastos mant. (USD/mes)</b></td><td>{m.GastosMantenimientoMes}</td></tr>
-<tr><td><b>Empleados planilla</b></td><td>{m.EmpleadosPlanilla}</td></tr>
-<tr><td><b>¿Horas extras?</b></td><td>{(m.ManejaHorasExtras ? "Sí" : "No")}</td></tr>
-<tr><td><b>¿Promotora?</b></td><td>{(m.HayPromotora ? "Sí" : "No")}</td></tr>
-<tr><td><b>Sistema contable</b></td><td>{m.SistemaContable}</td></tr>
-<tr><td><b>EEFF auditados</b></td><td>{(m.EEFFAuditados ? "Sí" : "No")}</td></tr>
-<tr><td><b>Contacto</b></td><td>{m.Contacto}</td></tr>
-<tr><td><b>Notas</b></td><td>{m.Notas}</td></tr>
-</table>
-<p style='color:#888'>*No enviar contraseñas por este medio.</p>";
-
-        var bodyBuilder = new BodyBuilder
+        var builder = new BodyBuilder
         {
-            HtmlBody = html,
-            TextBody = Regex.Replace(html, "<.*?>", " ")
+            TextBody = body.Replace("\r\n", "\n"),
+            HtmlBody = $"<pre style='font-family:ui-monospace,monospace'>{System.Net.WebUtility.HtmlEncode(body)}</pre>"
         };
-        msg.Body = bodyBuilder.ToMessageBody();
+        msg.Body = builder.ToMessageBody();
 
-        using var smtp = new SmtpClient();
-        await smtp.ConnectAsync(_opt.Smtp.Host, _opt.Smtp.Port,
-            _opt.Smtp.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto);
-        await smtp.AuthenticateAsync(_opt.Smtp.User, _opt.Smtp.Password);
-        await smtp.SendAsync(msg);
-        await smtp.DisconnectAsync(true);
+        using var client = new SmtpClient();
+
+        try
+        {
+            // Algunos proveedores con certs auto-firmados en dev:
+            // client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+            var secure = _opt.Smtp.UseStartTls
+                ? SecureSocketOptions.StartTls           // 587
+                : SecureSocketOptions.SslOnConnect;      // 465
+
+            client.CheckCertificateRevocation = false;
+            client.AuthenticationMechanisms.Remove("XOAUTH2"); // forzar user/pass
+
+            _log.LogInformation("Conectando a {Host}:{Port} (StartTLS={StartTls})", _opt.Smtp.Host, _opt.Smtp.Port, _opt.Smtp.UseStartTls);
+            await client.ConnectAsync(_opt.Smtp.Host, _opt.Smtp.Port, secure);
+
+            _log.LogInformation("Autenticando como {User}", _opt.Smtp.User);
+            await client.AuthenticateAsync(_opt.Smtp.User, _opt.Smtp.Password);
+
+            _log.LogInformation("Enviando correo a {To}", _opt.To);
+            await client.SendAsync(msg);
+
+            _log.LogInformation("Correo enviado correctamente.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Fallo al enviar correo SMTP");
+            // Re-lanzamos con mensaje limpio para que lo veas en UI mientras pruebas
+            throw new InvalidOperationException($"SMTP error: {ex.Message}", ex);
+        }
+        finally
+        {
+            try { await client.DisconnectAsync(true); } catch { /* ignore */ }
+        }
     }
 }

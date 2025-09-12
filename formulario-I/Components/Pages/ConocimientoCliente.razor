@@ -13,8 +13,7 @@
                 </div>
 
                 <div class="card-body">
-                    <EditForm FormName="ConocimientoCliente" Model="@Modelo" OnValidSubmit="Enviar">
-                        <AntiforgeryToken />
+                    <EditForm Model="@Modelo" OnValidSubmit="Enviar">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-danger" />
 
