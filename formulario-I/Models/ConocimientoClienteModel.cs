@@ -1,32 +1,88 @@
-﻿namespace FormularioL.Models;
+﻿using System.ComponentModel.DataAnnotations;
 
-using System.ComponentModel.DataAnnotations;
+namespace FormularioL.Models;
 
-public class ConocimientoClienteModel
+public sealed class ConocimientoClienteModel
 {
-    [Required, Range(typeof(bool), "true", "true", ErrorMessage = "Debes aceptar el aviso de privacidad.")]
-    public bool AceptaPrivacidad { get; set; }
+    [Display(Name = "Nombre del P.H.")]
+    [Required(ErrorMessage = "Indica el nombre del P.H.")]
+    [StringLength(120, ErrorMessage = "Máx. {1} caracteres.")]
+    public string NombrePH { get; set; } = "";
 
-    public string? CodigoInterno { get; set; } // honeypot anti-bot
+    [Display(Name = "RUC")]
+    [Required(ErrorMessage = "Indica el RUC.")]
+    [StringLength(30, ErrorMessage = "Máx. {1} caracteres.")]
+    public string RUC { get; set; } = "";
 
-    [Required, Display(Name = "Nombre del P.H.")] public string NombrePH { get; set; } = "";
-    [Required] public string RUC { get; set; } = "";
-    [Required] public string DV { get; set; } = "";
-    [Required, EmailAddress, Display(Name = "Correo para envío de propuesta")]
-    public string CorreoPropuesta { get; set; } = "";
-    [Required, Display(Name = "Dirección física del P.H.")] public string Direccion { get; set; } = "";
-    [Required, Range(1, int.MaxValue), Display(Name = "Unidades inmobiliarias")] public int Unidades { get; set; }
-    [Required, Range(1, int.MaxValue), Display(Name = "Torres")] public int Torres { get; set; }
-    [Required, Range(0, double.MaxValue), Display(Name = "Cuota de mantenimiento (USD/mes)")]
+    [Display(Name = "DV")]
+    [Required(ErrorMessage = "Indica el DV.")]
+    [StringLength(10, ErrorMessage = "Máx. {1} caracteres.")]
+    public string DV { get; set; } = "";
+
+    [Display(Name = "Correo para envío de propuesta")]
+    [Required(ErrorMessage = "Indica un correo de contacto.")]
+    [EmailAddress(ErrorMessage = "Correo inválido.")]
+    [StringLength(200, ErrorMessage = "Máx. {1} caracteres.")]
+    public string? CorreoPropuesta { get; set; }
+
+    [Display(Name = "Dirección física del P.H.")]
+    [Required(ErrorMessage = "Indica la dirección.")]
+    [StringLength(300, ErrorMessage = "Máx. {1} caracteres.")]
+    public string? Direccion { get; set; }
+
+    [Display(Name = "Unidades inmobiliarias")]
+    [Range(0, 100000, ErrorMessage = "Valor fuera de rango.")]
+    public int Unidades { get; set; }
+
+    [Display(Name = "Torres")]
+    [Range(0, 10000, ErrorMessage = "Valor fuera de rango.")]
+    public int Torres { get; set; }
+
+    [Display(Name = "Cuota mantenimiento (USD/mes)")]
+    [Range(0, 1_000_000, ErrorMessage = "Valor fuera de rango.")]
     public decimal CuotaMantenimientoMes { get; set; }
-    [Required, Range(0, double.MaxValue), Display(Name = "Gastos de mantenimiento (USD/mes)")]
+
+    [Display(Name = "Gastos mantenimiento (USD/mes)")]
+    [Range(0, 1_000_000, ErrorMessage = "Valor fuera de rango.")]
     public decimal GastosMantenimientoMes { get; set; }
-    [Required, Range(0, int.MaxValue), Display(Name = "Empleados de planilla")]
+
+    [Display(Name = "Empleados de planilla")]
+    [Range(0, 10000, ErrorMessage = "Valor fuera de rango.")]
     public int EmpleadosPlanilla { get; set; }
-    [Required, Display(Name = "¿Manejan horas extras?")] public bool ManejaHorasExtras { get; set; }
-    [Required, Display(Name = "¿Hay promotora en el P.H.?")] public bool HayPromotora { get; set; }
-    [Required, Display(Name = "Sistema contable")] public string SistemaContable { get; set; } = "";
-    [Required, Display(Name = "EEFF auditados (año previo)")] public bool EEFFAuditados { get; set; }
-    [Required, Display(Name = "Contacto responsable (nombre y teléfono)")] public string Contacto { get; set; } = "";
-    [Display(Name = "Notas (no incluir contraseñas)")] public string? Notas { get; set; }
+
+    [Display(Name = "¿Manejan horas extras?")]
+    public bool ManejaHorasExtras { get; set; }
+
+    [Display(Name = "¿Hay promotora en el P.H.?")]
+    public bool HayPromotora { get; set; }
+
+    [Display(Name = "Sistema contable")]
+    [Required(ErrorMessage = "Indica el sistema contable.")]
+    [StringLength(120, ErrorMessage = "Máx. {1} caracteres.")]
+    public string? SistemaContable { get; set; }
+
+    [Display(Name = "EEFF auditados (año previo)")]
+    public bool EEFFAuditados { get; set; }
+
+    [Display(Name = "Contacto responsable (nombre y teléfono)")]
+    [Required(ErrorMessage = "Indica un contacto.")]
+    [StringLength(200, ErrorMessage = "Máx. {1} caracteres.")]
+    public string? Contacto { get; set; }
+
+    [Display(Name = "Notas (no incluir contraseñas)")]
+    [StringLength(1000, ErrorMessage = "Máx. {1} caracteres.")]
+    public string? Notas { get; set; }
+
+    // Honeypot anti-bot (campo oculto en el formulario)
+    public string? CodigoInterno { get; set; }
+
+    [Display(Name = "Acepto el uso de esta información")]
+    [RequiredTrue(ErrorMessage = "Debes aceptar para continuar.")]
+    public bool AceptaPrivacidad { get; set; }
+}
+
+/// <summary>Validador para checks obligatorios.</summary>
+public sealed class RequiredTrueAttribute : ValidationAttribute
+{
+    public override bool IsValid(object? value) => value is bool b && b;
 }
