@@ -2,35 +2,40 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
 
-    <!-- 1) Bootstrap CSS (primero) -->
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-          integrity="sha384-mQ93ZkKJ0pBefc3mX8QnCw7H6Cw1+E5Yp9N8o0mB3jQdA/1ybw6Q2sSg9QZ1jZyM"
+    <!-- 1) Bootstrap CSS (SRI oficial y válido) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
           crossorigin="anonymous">
 
-    <!-- 2) Tus estilos -->
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["formulario-l.styles.css"]" />
+    <!-- 2) Tus estilos de la app (opcional) -->
+    <link rel="stylesheet" href="app.css" />
 
-    <!-- 3) CSS de React -->
+    <!-- 3) CSS generado por Vite/React (si existe) -->
     <link rel="stylesheet" href="/react/main.css" />
 
+    <ImportMap />
     <HeadOutlet />
 </head>
 <body>
+    <!-- Enrutador de Razor Components -->
     <Routes />
 
+    <!-- Token antifalsificación global (necesario con app.UseAntiforgery()) -->
+    <AntiforgeryToken />
+
+    <!-- 4) Blazor runtime -->
     <script src="_framework/blazor.web.js"></script>
 
-    <!-- 4) Bootstrap JS bundle (popper incluido) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-ybvpv8l9YcX1Zg1mKeGZk2mJZr8gFqT5Y0D8w9C3wRr2uQY/6E8lS3ig5YYy0H3B"
+    <!-- 5) Bootstrap JS bundle (SRI oficial y válido) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
             crossorigin="anonymous"></script>
 
-    <!-- 5) React bundle -->
+    <!-- 6) Bundle de Vite/React (si existe) -->
     <script type="module" src="/react/main.js"></script>
 </body>
 </html>
