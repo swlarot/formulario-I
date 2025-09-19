@@ -1,171 +1,163 @@
-﻿using MailKit.Net.Smtp;
+﻿// Services/EmailService.cs
+using System;
+using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using FormularioL.Models;
+using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 
-namespace FormularioL.Services;
-
-public sealed class EmailService : IEmailService
+namespace FormularioL.Services
 {
-    private readonly EmailOptions _opt;
-    private readonly ILogger<EmailService> _log;
-
-    public EmailService(IOptions<EmailOptions> opt, ILogger<EmailService> log)
+    public class EmailService : IEmailService
     {
-        _opt = opt.Value;
-        _log = log;
-    }
+        private readonly EmailOptions _opt;
+        private readonly ILogger<EmailService> _log;
 
-    public async Task SendConocimientoClienteAsync(Models.ConocimientoClienteModel m)
-    {
-        // 1) Honeypot: si se llenó, ignoramos (probable bot)
-        if (!string.IsNullOrEmpty(m.CodigoInterno))
+        public EmailService(IOptions<EmailOptions> options, ILogger<EmailService> log)
         {
-            _log.LogWarning("Formulario descartado por honeypot.");
-            return;
+            _opt = options.Value;
+            _log = log;
         }
 
-        // 2) Validaciones mínimas de config
-        if (string.IsNullOrWhiteSpace(_opt.To))
-            throw new InvalidOperationException("Email:To no está configurado.");
-        if (string.IsNullOrWhiteSpace(_opt.Smtp.Host))
-            throw new InvalidOperationException("Email:Smtp:Host no está configurado.");
-        if (_opt.Smtp.Port <= 0)
-            throw new InvalidOperationException("Email:Smtp:Port inválido.");
-        if (string.IsNullOrWhiteSpace(_opt.Smtp.User))
-            throw new InvalidOperationException("Email:Smtp:User no está configurado.");
-        if (string.IsNullOrWhiteSpace(_opt.Smtp.Password))
-            throw new InvalidOperationException("Email:Smtp:Password no está configurado.");
+        // -------------------- PH (existente) --------------------
+        public Task SendConocimientoClienteAsync(ConocimientoClienteModel m)
+            => SendConocimientoClienteAsync(m, "ph", default);
 
-        var from = _opt.From ?? _opt.Smtp.User; // De preferencia From = ayuda@clau.com.pa
-        var ahora = DateTimeOffset.Now;
-
-        // 3) Construcción del mensaje principal (interno a ayuda)
-        var msg = new MimeMessage();
-
-        // Nombre visible del remitente (branding) y remitente SMTP real
-        msg.From.Clear();
-        msg.From.Add(new MailboxAddress("CLAU – Ayuda", from));
-        msg.Sender = MailboxAddress.Parse(_opt.Smtp.User); // cuenta autenticada (gmail)
-
-        msg.To.Add(MailboxAddress.Parse(_opt.To));
-
-        // Si el solicitante puso correo, usarlo como Reply-To (responder le escribe a él)
-        if (!string.IsNullOrWhiteSpace(m.CorreoPropuesta))
-            msg.ReplyTo.Add(MailboxAddress.Parse(m.CorreoPropuesta));
-
-        msg.Subject = $"Conocimiento del Cliente - {m.NombrePH} ({ahora:yyyy-MM-dd HH:mm})";
-
-        // Texto plano (fallback)
-        var textBody = $@"
-Nombre PH: {m.NombrePH}
-RUC: {m.RUC} - DV: {m.DV}
-Correo propuesta: {m.CorreoPropuesta}
-Dirección: {m.Direccion}
-Unidades: {m.Unidades} | Torres: {m.Torres}
-Cuota USD/mes: {m.CuotaMantenimientoMes} | Gastos USD/mes: {m.GastosMantenimientoMes}
-Empleados planilla: {m.EmpleadosPlanilla} | Horas extras: {m.ManejaHorasExtras}
-Promotora: {m.HayPromotora}
-Sistema contable: {m.SistemaContable}
-EEFF auditados: {m.EEFFAuditados}
-Contacto: {m.Contacto}
-Notas: {m.Notas}
-".Replace("\r\n", "\n").Trim();
-
-        // HTML bonito en tabla
-        string E(string? s) => System.Net.WebUtility.HtmlEncode(s ?? "");
-        var htmlBody = $@"
-<style>
-table{{border-collapse:collapse;font-family:system-ui,Segoe UI,Arial,sans-serif}}
-td,th{{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;font-size:14px}}
-th{{background:#111827;color:#fff}}
-h2{{font:600 18px system-ui;margin:0 0 10px}}
-small{{color:#6b7280}}
-</style>
-<h2>Conocimiento del Cliente</h2>
-<small>Recibido: {ahora:yyyy-MM-dd HH:mm zzz}</small>
-<table>
-<tr><th>Campo</th><th>Valor</th></tr>
-<tr><td>Nombre PH</td><td>{E(m.NombrePH)}</td></tr>
-<tr><td>RUC / DV</td><td>{E(m.RUC)} / {E(m.DV)}</td></tr>
-<tr><td>Correo propuesta</td><td>{E(m.CorreoPropuesta)}</td></tr>
-<tr><td>Dirección</td><td>{E(m.Direccion)}</td></tr>
-<tr><td>Unidades / Torres</td><td>{m.Unidades} / {m.Torres}</td></tr>
-<tr><td>Cuota USD/mes</td><td>{m.CuotaMantenimientoMes}</td></tr>
-<tr><td>Gastos USD/mes</td><td>{m.GastosMantenimientoMes}</td></tr>
-<tr><td>Empleados / Horas extra</td><td>{m.EmpleadosPlanilla} / {m.ManejaHorasExtras}</td></tr>
-<tr><td>Promotora</td><td>{m.HayPromotora}</td></tr>
-<tr><td>Sistema contable</td><td>{E(m.SistemaContable)}</td></tr>
-<tr><td>EEFF auditados</td><td>{m.EEFFAuditados}</td></tr>
-<tr><td>Contacto</td><td>{E(m.Contacto)}</td></tr>
-<tr><td>Notas</td><td>{E(m.Notas)}</td></tr>
-</table>";
-
-        var builder = new BodyBuilder
+        public async Task SendConocimientoClienteAsync(ConocimientoClienteModel m, string entidadSlug, CancellationToken ct)
         {
-            TextBody = textBody,
-            HtmlBody = htmlBody
-        };
-        msg.Body = builder.ToMessageBody();
+            string entidadKey = (entidadSlug ?? "ph").Trim().ToLowerInvariant();
+            string entidadUp = entidadKey.ToUpperInvariant();
+            string N2(decimal d) => d.ToString("N2", CultureInfo.CurrentCulture);
 
-        using var client = new SmtpClient();
-
-        try
-        {
-            var secure = _opt.Smtp.UseStartTls
-                ? SecureSocketOptions.StartTls       // 587
-                : SecureSocketOptions.SslOnConnect;  // 465
-
-            client.CheckCertificateRevocation = false;
-            client.AuthenticationMechanisms.Remove("XOAUTH2"); // forzar user/pass
-
-            _log.LogInformation("Conectando a {Host}:{Port} (StartTLS={StartTls})", _opt.Smtp.Host, _opt.Smtp.Port, _opt.Smtp.UseStartTls);
-            await client.ConnectAsync(_opt.Smtp.Host, _opt.Smtp.Port, secure);
-
-            _log.LogInformation("Autenticando como {User}", _opt.Smtp.User);
-            await client.AuthenticateAsync(_opt.Smtp.User, _opt.Smtp.Password);
-
-            _log.LogInformation("Enviando correo a {To}", _opt.To);
-            await client.SendAsync(msg);
-
-            // 4) Acuse al solicitante (si dejó correo)
+            var msg = new MimeMessage();
+            msg.From.Add(MailboxAddress.Parse(_opt.From));
+            msg.To.Add(MailboxAddress.Parse(GetRoutedTo(entidadKey)));
             if (!string.IsNullOrWhiteSpace(m.CorreoPropuesta))
+                msg.ReplyTo.Add(MailboxAddress.Parse(m.CorreoPropuesta));
+            msg.Subject = $"Conocimiento – {entidadUp} – {m.NombrePH}";
+
+            var html = $@"
+<h2>Conocimiento del Cliente — {entidadUp}</h2>
+<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>
+<tr><td><b>Nombre del P.H.</b></td><td>{m.NombrePH}</td></tr>
+<tr><td><b>RUC</b></td><td>{m.RUC}-{m.DV}</td></tr>
+<tr><td><b>Dirección</b></td><td>{m.Direccion}</td></tr>
+<tr><td><b>Correo propuesta</b></td><td>{m.CorreoPropuesta}</td></tr>
+<tr><td><b>Unidades</b></td><td>{m.Unidades}</td></tr>
+<tr><td><b>Torres</b></td><td>{m.Torres}</td></tr>
+<tr><td><b>Cuota mantenimiento (USD/mes)</b></td><td>{N2(m.CuotaMantenimientoMes)}</td></tr>
+<tr><td><b>Gastos mantenimiento (USD/mes)</b></td><td>{N2(m.GastosMantenimientoMes)}</td></tr>
+<tr><td><b>Empleados planilla</b></td><td>{m.EmpleadosPlanilla}</td></tr>
+<tr><td><b>¿Horas extras?</b></td><td>{(m.ManejaHorasExtras ? "Sí" : "No")}</td></tr>
+<tr><td><b>¿Promotora?</b></td><td>{(m.HayPromotora ? "Sí" : "No")}</td></tr>
+<tr><td><b>Sistema contable</b></td><td>{m.SistemaContable}</td></tr>
+<tr><td><b>EEFF auditados (año previo)</b></td><td>{(m.EEFFAuditados ? "Sí" : "No")}</td></tr>
+<tr><td><b>Contacto</b></td><td>{m.Contacto}</td></tr>
+<tr><td><b>Notas</b></td><td>{m.Notas}</td></tr>
+</table>
+<p style='color:#888; margin-top:8px'>*No enviar contraseñas por este medio.</p>";
+
+            msg.Body = new BodyBuilder { HtmlBody = html, TextBody = StripHtml(html) }.ToMessageBody();
+            await SendAsync(msg, ct);
+            await SendAckIfAppliesAsync(m.CorreoPropuesta, ct);
+        }
+
+        // -------------------- SA (nuevo) --------------------
+        public async Task SendSaAsync(SaFormModel m, CancellationToken ct = default)
+        {
+            const string entidadKey = "sa";
+            string N2(decimal d) => d.ToString("N2", CultureInfo.CurrentCulture);
+
+            var msg = new MimeMessage();
+            msg.From.Add(MailboxAddress.Parse(_opt.From));
+            msg.To.Add(MailboxAddress.Parse(GetRoutedTo(entidadKey)));
+            if (!string.IsNullOrWhiteSpace(m.CorreoPropuesta))
+                msg.ReplyTo.Add(MailboxAddress.Parse(m.CorreoPropuesta));
+            msg.Subject = $"Conocimiento – SA – {m.RazonSocial}";
+
+            // HTML específico para SA
+            var html = $@"
+<h2>Conocimiento del Cliente — SA</h2>
+<table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;'>
+<tr><td><b>Razón social</b></td><td>{m.RazonSocial}</td></tr>
+<tr><td><b>RUC</b></td><td>{m.RUC}-{m.DV}</td></tr>
+<tr><td><b>Dirección</b></td><td>{m.Direccion}</td></tr>
+<tr><td><b>Correo propuesta</b></td><td>{m.CorreoPropuesta}</td></tr>
+
+<tr><td><b>Actividad económica</b></td><td>{m.ActividadEconomica}</td></tr>
+<tr><td><b>Año de constitución</b></td><td>{m.AnioConstitucion}</td></tr>
+<tr><td><b>Capital social (USD)</b></td><td>{(m.CapitalSocial is null ? "" : N2(m.CapitalSocial.Value))}</td></tr>
+<tr><td><b>N.º accionistas</b></td><td>{m.NumeroAccionistas}</td></tr>
+<tr><td><b>Miembros junta/directores</b></td><td>{m.MiembrosJunta}</td></tr>
+<tr><td><b>Empleados planilla</b></td><td>{m.EmpleadosPlanilla}</td></tr>
+<tr><td><b>Facturación mensual promedio (USD)</b></td><td>{(m.FacturacionMensualPromedio is null ? "" : N2(m.FacturacionMensualPromedio.Value))}</td></tr>
+<tr><td><b>N.º cuentas bancarias</b></td><td>{m.NumeroCuentasBancarias}</td></tr>
+<tr><td><b>Operaciones en el exterior</b></td><td>{(m.OperacionesExterior ? "Sí" : "No")}</td></tr>
+<tr><td><b>EEFF auditados (año previo)</b></td><td>{(m.EEFFAuditados ? "Sí" : "No")}</td></tr>
+
+<tr><td><b>Sistema contable</b></td><td>{m.SistemaContable}</td></tr>
+<tr><td><b>Contacto</b></td><td>{m.Contacto}</td></tr>
+<tr><td><b>Notas</b></td><td>{m.Notas}</td></tr>
+</table>
+<p style='color:#888; margin-top:8px'>*No enviar contraseñas por este medio.</p>";
+
+            msg.Body = new BodyBuilder { HtmlBody = html, TextBody = StripHtml(html) }.ToMessageBody();
+            await SendAsync(msg, ct);
+            await SendAckIfAppliesAsync(m.CorreoPropuesta, ct);
+        }
+
+        // -------------------- Helpers comunes --------------------
+        private string GetRoutedTo(string entidadKey)
+            => (_opt.Routing != null && _opt.Routing.TryGetValue(entidadKey, out var to) && !string.IsNullOrWhiteSpace(to))
+                ? to
+                : _opt.To;
+
+        private async Task SendAsync(MimeMessage message, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
             {
-                var ack = new MimeMessage();
-
-                // Misma identidad visible y remitente SMTP real
-                ack.From.Clear();
-                ack.From.Add(new MailboxAddress("CLAU – Ayuda", from));
-                ack.Sender = MailboxAddress.Parse(_opt.Smtp.User);
-
-                ack.To.Add(MailboxAddress.Parse(m.CorreoPropuesta!));
-
-                // Que las respuestas del acuse vayan a ayuda
-                ack.ReplyTo.Clear();
-                ack.ReplyTo.Add(MailboxAddress.Parse(_opt.To!));
-
-                ack.Subject = $"Recibido: Conocimiento del Cliente - {m.NombrePH}";
-                ack.Body = new BodyBuilder
-                {
-                    TextBody = $"Hola,\n\nHemos recibido tu información para el P.H. {m.NombrePH}. Pronto te contactaremos.\n\nSaludos,\nEquipo CLAU",
-                    HtmlBody = $"<p>Hola,</p><p>Hemos recibido tu información para el P.H. <b>{E(m.NombrePH)}</b>. Pronto te contactaremos.</p><p>Saludos,<br/>Equipo CLAU</p>"
-                }.ToMessageBody();
-
-                _log.LogInformation("Enviando acuse a {Correo}", m.CorreoPropuesta);
-                await client.SendAsync(ack);
+                using var smtp = new SmtpClient { Timeout = _opt.Smtp.TimeoutMs };
+                await smtp.ConnectAsync(
+                    _opt.Smtp.Host,
+                    _opt.Smtp.Port,
+                    _opt.Smtp.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto,
+                    ct);
+                await smtp.AuthenticateAsync(_opt.Smtp.User, _opt.Smtp.Password, ct);
+                await smtp.SendAsync(message, ct);
+                await smtp.DisconnectAsync(true, ct);
+                _log.LogInformation("Email enviado a {To} en {Elapsed} ms.", string.Join(",", message.To), sw.ElapsedMilliseconds);
             }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Error enviando correo.");
+                throw;
+            }
+        }
 
-            _log.LogInformation("Correos enviados correctamente.");
-        }
-        catch (Exception ex)
+        private async Task SendAckIfAppliesAsync(string? destinatario, CancellationToken ct)
         {
-            _log.LogError(ex, "Fallo al enviar correo SMTP");
-            throw new InvalidOperationException($"SMTP error: {ex.Message}", ex);
+            if (!_opt.Ack.Enabled || string.IsNullOrWhiteSpace(destinatario)) return;
+
+            var ackFrom = string.IsNullOrWhiteSpace(_opt.Ack.From) ? _opt.From : _opt.Ack.From;
+            var ack = new MimeMessage();
+            ack.From.Add(MailboxAddress.Parse(ackFrom));
+            ack.To.Add(MailboxAddress.Parse(destinatario));
+            ack.Subject = _opt.Ack.Subject;
+            ack.Body = new BodyBuilder
+            {
+                HtmlBody = _opt.Ack.HtmlBody,
+                TextBody = _opt.Ack.TextBody
+            }.ToMessageBody();
+
+            await SendAsync(ack, ct);
         }
-        finally
-        {
-            try { await client.DisconnectAsync(true); } catch { /* ignore */ }
-        }
+
+        private static string StripHtml(string html) => Regex.Replace(html, "<.*?>", " ").Trim();
     }
 }

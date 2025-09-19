@@ -1,241 +1,58 @@
 ﻿@page "/"
 @page "/conocimiento-cliente"
+
+@* -------------------------------------------------------------
+   ConocimientoCliente.razor  (.NET 9)
+   - PH: token antiforgery con el MISMO nombre de formulario
+   - SA: se monta <SAForm /> cuando ?entidad=sa
+   ------------------------------------------------------------- *@
+
 @using FormularioL.Models
 @using FormularioL.Services
+@using Microsoft.AspNetCore.WebUtilities
+@using formulario_I.Components
+
 @inject IEmailService EmailSvc
-
-<div class="container py-4">
-    <div class="row justify-content-center">
-        <div class="col-12 col-lg-8">
-
-            <!-- ▼▼▼ Punto de montaje para React (selector de entidad) ▼▼▼ -->
-            <div id="entity-react-root" class="mb-4"></div>
-            <!-- ▲▲▲ No quitar: /react/main.js se monta aquí si existe este div ▲▲▲ -->
-
-            <div class="card shadow-sm">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Conocimiento del Cliente</h5>
-                </div>
-
-                <div class="card-body">
-                    <EditForm Model="@Modelo" OnValidSubmit="Enviar">
-                        <DataAnnotationsValidator />
-                        <ValidationSummary class="text-danger" />
-
-                        <!-- Honeypot anti-bot: invisible, sin foco y sin lectores -->
-                        <input style="display:none" tabindex="-1" aria-hidden="true"
-                               autocomplete="off" @bind="Modelo.CodigoInterno" />
-
-                        <!-- NOMBRE PH -->
-                        <div class="mb-3">
-                            <label class="form-label">Nombre del P.H.</label>
-                            <InputText class="form-control"
-                                       @bind-Value="Modelo.NombrePH"
-                                       placeholder="p. ej., PH BUENA VISTA"
-                                       autocomplete="organization"
-                                       maxlength="120" />
-                            <ValidationMessage For="@(() => Modelo.NombrePH)" />
-                        </div>
-
-                        <!-- RUC / DV -->
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">RUC</label>
-                                <InputText class="form-control"
-                                           @bind-Value="Modelo.RUC"
-                                           placeholder="RUC"
-                                           inputmode="numeric"
-                                           autocomplete="off"
-                                           maxlength="30" />
-                                <ValidationMessage For="@(() => Modelo.RUC)" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">DV</label>
-                                <InputText class="form-control"
-                                           @bind-Value="Modelo.DV"
-                                           placeholder="DV"
-                                           inputmode="numeric"
-                                           autocomplete="off"
-                                           maxlength="10" />
-                                <ValidationMessage For="@(() => Modelo.DV)" />
-                            </div>
-                        </div>
-
-                        <!-- CORREO -->
-                        <div class="mb-3">
-                            <label class="form-label">Correo para envío de propuesta</label>
-                            <InputText type="email" class="form-control"
-                                       @bind-Value="Modelo.CorreoPropuesta"
-                                       placeholder="correo@dominio.com"
-                                       autocomplete="email"
-                                       maxlength="200" />
-                            <ValidationMessage For="@(() => Modelo.CorreoPropuesta)" />
-                        </div>
-
-                        <!-- DIRECCIÓN -->
-                        <div class="mb-3">
-                            <label class="form-label">Dirección física del P.H.</label>
-                            <InputTextArea class="form-control"
-                                           @bind-Value="Modelo.Direccion"
-                                           rows="2"
-                                           placeholder="Calle, número, sector…"
-                                           maxlength="300" />
-                            <ValidationMessage For="@(() => Modelo.Direccion)" />
-                        </div>
-
-                        <!-- UNIDADES / TORRES -->
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Unidades inmobiliarias</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="Modelo.Unidades"
-                                             min="0" step="1" inputmode="numeric" />
-                                <ValidationMessage For="@(() => Modelo.Unidades)" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Torres</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="Modelo.Torres"
-                                             min="0" step="1" inputmode="numeric" />
-                                <ValidationMessage For="@(() => Modelo.Torres)" />
-                            </div>
-                        </div>
-
-                        <!-- CUOTA / GASTOS -->
-                        <div class="row g-3 mt-0">
-                            <div class="col-md-6">
-                                <label class="form-label">Cuota mantenimiento (USD/mes)</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="Modelo.CuotaMantenimientoMes"
-                                             min="0" step="0.01" inputmode="decimal" />
-                                <ValidationMessage For="@(() => Modelo.CuotaMantenimientoMes)" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Gastos mantenimiento (USD/mes)</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="Modelo.GastosMantenimientoMes"
-                                             min="0" step="0.01" inputmode="decimal" />
-                                <ValidationMessage For="@(() => Modelo.GastosMantenimientoMes)" />
-                            </div>
-                        </div>
-
-                        <!-- EMPLEADOS + CHECKS -->
-                        <div class="row g-3 mt-0">
-                            <div class="col-md-4">
-                                <label class="form-label">Empleados de planilla</label>
-                                <InputNumber class="form-control"
-                                             @bind-Value="Modelo.EmpleadosPlanilla"
-                                             min="0" step="1" inputmode="numeric" />
-                                <ValidationMessage For="@(() => Modelo.EmpleadosPlanilla)" />
-                            </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div class="form-check">
-                                    <InputCheckbox class="form-check-input"
-                                                   @bind-Value="Modelo.ManejaHorasExtras" />
-                                    <label class="form-check-label ms-1">¿Manejan horas extras?</label>
-                                </div>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div class="form-check">
-                                    <InputCheckbox class="form-check-input"
-                                                   @bind-Value="Modelo.HayPromotora" />
-                                    <label class="form-check-label ms-1">¿Hay promotora en el P.H.?</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- SISTEMA -->
-                        <div class="mb-3 mt-2">
-                            <label class="form-label">Sistema contable</label>
-                            <InputText class="form-control"
-                                       @bind-Value="Modelo.SistemaContable"
-                                       placeholder="p. ej., Core360, Sage50…"
-                                       maxlength="120" />
-                            <ValidationMessage For="@(() => Modelo.SistemaContable)" />
-                        </div>
-
-                        <!-- EEFF -->
-                        <div class="form-check mb-3">
-                            <InputCheckbox class="form-check-input" @bind-Value="Modelo.EEFFAuditados" />
-                            <label class="form-check-label ms-1">EEFF auditados (año previo)</label>
-                        </div>
-
-                        <!-- CONTACTO -->
-                        <div class="mb-3">
-                            <label class="form-label">Contacto responsable (nombre y teléfono)</label>
-                            <InputTextArea class="form-control"
-                                           @bind-Value="Modelo.Contacto"
-                                           rows="2"
-                                           placeholder="Nombre y teléfono"
-                                           maxlength="200" />
-                            <ValidationMessage For="@(() => Modelo.Contacto)" />
-                        </div>
-
-                        <!-- NOTAS -->
-                        <div class="mb-3">
-                            <label class="form-label">Notas (no incluir contraseñas)</label>
-                            <InputTextArea class="form-control"
-                                           @bind-Value="Modelo.Notas"
-                                           rows="2"
-                                           placeholder="Observaciones (no incluir contraseñas)"
-                                           maxlength="1000" />
-                        </div>
-
-                        <!-- CONSENTIMIENTO -->
-                        <div class="form-check mb-3">
-                            <InputCheckbox class="form-check-input" @bind-Value="Modelo.AceptaPrivacidad" />
-                            <label class="form-check-label ms-1">
-                                Acepto el uso de esta información para elaborar la propuesta. No enviaré contraseñas por este medio.
-                            </label>
-                            <ValidationMessage For="@(() => Modelo.AceptaPrivacidad)" />
-                        </div>
-
-                        <!-- BOTÓN -->
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg" disabled="@(Enviando)">
-                                @if (Enviando)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                    <span>Enviando…</span>
-                                }
-                                else
-                                {
-                                    <span>Enviar</span>
-                                }
-                            </button>
-                        </div>
-                    </EditForm>
-
-                    @if (ErrorMsg is not null)
-                    {
-                        <div class="alert alert-danger mt-3">@ErrorMsg</div>
-                    }
-                    @if (EnviadoOk)
-                    {
-                        <div class="alert alert-success mt-3 mb-0">
-                            ¡Enviado! Revisaremos tu información.
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+@inject NavigationManager Nav
 
 @code {
+    private string EntidadSlug { get; set; } = "ph";
     private ConocimientoClienteModel Modelo = new();
+
     private bool EnviadoOk;
     private string? ErrorMsg;
     private bool Enviando;
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var q = QueryHelpers.ParseQuery(uri.Query);
+        if (q.TryGetValue("entidad", out var e))
+        {
+            var raw = e.ToString();
+            if (!string.IsNullOrWhiteSpace(raw))
+                EntidadSlug = raw.Trim().ToLowerInvariant();
+        }
+    }
+
+    private bool EsPH => string.IsNullOrWhiteSpace(EntidadSlug) || EntidadSlug == "ph";
 
     private async Task Enviar()
     {
         try
         {
             Enviando = true; ErrorMsg = null; EnviadoOk = false;
-            await EmailSvc.SendConocimientoClienteAsync(Modelo);
+
+            // Honeypot: si trae texto, cortar silenciosamente
+            if (!string.IsNullOrWhiteSpace(Modelo.CodigoInterno))
+            {
+                EnviadoOk = true;
+                return;
+            }
+
+            await EmailSvc.SendConocimientoClienteAsync(Modelo!, EntidadSlug ?? "ph");
             EnviadoOk = true;
-            Modelo = new();  // limpiar
+            Modelo = new(); // limpiar
         }
         catch (Exception ex)
         {
@@ -249,3 +66,246 @@
         }
     }
 }
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+
+            <!-- Punto de montaje para el selector React -->
+            <div id="entity-react-root" class="mb-4"></div>
+
+            @if (EsPH)
+            {
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">Conocimiento del Cliente</h5>
+                    </div>
+
+                    <div class="card-body">
+                        @* IMPORTANTE (.NET 9):
+                           - Method="post"
+                           - FormName="kyc-ph"
+                           - AntiforgeryToken con FormName="kyc-ph" *@
+                        <EditForm Model="@Modelo" OnValidSubmit="Enviar"
+                                  Method="post" FormName="kyc-ph">
+                            <AntiforgeryToken FormName="kyc-ph" />
+
+                            <DataAnnotationsValidator />
+                            <ValidationSummary class="text-danger" />
+
+                            <!-- Honeypot anti-bot -->
+                            <input style="display:none" tabindex="-1" aria-hidden="true"
+                                   autocomplete="off" @bind="Modelo.CodigoInterno" />
+
+                            <!-- NOMBRE PH -->
+                            <div class="mb-3">
+                                <label class="form-label">Nombre del P.H.</label>
+                                <InputText class="form-control"
+                                           @bind-Value="Modelo.NombrePH"
+                                           placeholder="p. ej., PH BUENA VISTA"
+                                           autocomplete="organization"
+                                           maxlength="120" />
+                                <ValidationMessage For="@(() => Modelo.NombrePH)" />
+                            </div>
+
+                            <!-- RUC / DV -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">RUC</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Modelo.RUC"
+                                               placeholder="RUC"
+                                               inputmode="numeric"
+                                               autocomplete="off"
+                                               maxlength="30" />
+                                    <ValidationMessage For="@(() => Modelo.RUC)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">DV</label>
+                                    <InputText class="form-control"
+                                               @bind-Value="Modelo.DV"
+                                               placeholder="DV"
+                                               inputmode="numeric"
+                                               autocomplete="off"
+                                               maxlength="10" />
+                                    <ValidationMessage For="@(() => Modelo.DV)" />
+                                </div>
+                            </div>
+
+                            <!-- CORREO -->
+                            <div class="mb-3">
+                                <label class="form-label">Correo para envío de propuesta</label>
+                                <InputText type="email" class="form-control"
+                                           @bind-Value="Modelo.CorreoPropuesta"
+                                           placeholder="correo@dominio.com"
+                                           autocomplete="email"
+                                           maxlength="200" />
+                                <ValidationMessage For="@(() => Modelo.CorreoPropuesta)" />
+                            </div>
+
+                            <!-- DIRECCIÓN -->
+                            <div class="mb-3">
+                                <label class="form-label">Dirección física del P.H.</label>
+                                <InputTextArea class="form-control"
+                                               @bind-Value="Modelo.Direccion"
+                                               rows="2"
+                                               placeholder="Calle, número, sector…"
+                                               maxlength="300" />
+                                <ValidationMessage For="@(() => Modelo.Direccion)" />
+                            </div>
+
+                            <!-- UNIDADES / TORRES -->
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Unidades inmobiliarias</label>
+                                    <InputNumber class="form-control"
+                                                 @bind-Value="Modelo.Unidades"
+                                                 min="0" step="1" inputmode="numeric" />
+                                    <ValidationMessage For="@(() => Modelo.Unidades)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Torres</label>
+                                    <InputNumber class="form-control"
+                                                 @bind-Value="Modelo.Torres"
+                                                 min="0" step="1" inputmode="numeric" />
+                                    <ValidationMessage For="@(() => Modelo.Torres)" />
+                                </div>
+                            </div>
+
+                            <!-- CUOTA / GASTOS -->
+                            <div class="row g-3 mt-0">
+                                <div class="col-md-6">
+                                    <label class="form-label">Cuota mantenimiento (USD/mes)</label>
+                                    <InputNumber class="form-control"
+                                                 @bind-Value="Modelo.CuotaMantenimientoMes"
+                                                 min="0" step="0.01" inputmode="decimal" />
+                                    <ValidationMessage For="@(() => Modelo.CuotaMantenimientoMes)" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Gastos mantenimiento (USD/mes)</label>
+                                    <InputNumber class="form-control"
+                                                 @bind-Value="Modelo.GastosMantenimientoMes"
+                                                 min="0" step="0.01" inputmode="decimal" />
+                                    <ValidationMessage For="@(() => Modelo.GastosMantenimientoMes)" />
+                                </div>
+                            </div>
+
+                            <!-- EMPLEADOS + CHECKS -->
+                            <div class="row g-3 mt-0">
+                                <div class="col-md-4">
+                                    <label class="form-label">Empleados de planilla</label>
+                                    <InputNumber class="form-control"
+                                                 @bind-Value="Modelo.EmpleadosPlanilla"
+                                                 min="0" step="1" inputmode="numeric" />
+                                    <ValidationMessage For="@(() => Modelo.EmpleadosPlanilla)" />
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <InputCheckbox class="form-check-input"
+                                                       @bind-Value="Modelo.ManejaHorasExtras" />
+                                        <label class="form-check-label ms-1">¿Manejan horas extras?</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <InputCheckbox class="form-check-input"
+                                                       @bind-Value="Modelo.HayPromotora" />
+                                        <label class="form-check-label ms-1">¿Hay promotora en el P.H.?</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SISTEMA -->
+                            <div class="mb-3 mt-2">
+                                <label class="form-label">Sistema contable</label>
+                                <InputText class="form-control"
+                                           @bind-Value="Modelo.SistemaContable"
+                                           placeholder="p. ej., Core360, Sage50…"
+                                           maxlength="120" />
+                                <ValidationMessage For="@(() => Modelo.SistemaContable)" />
+                            </div>
+
+                            <!-- EEFF -->
+                            <div class="form-check mb-3">
+                                <InputCheckbox class="form-check-input" @bind-Value="Modelo.EEFFAuditados" />
+                                <label class="form-check-label ms-1">EEFF auditados (año previo)</label>
+                            </div>
+
+                            <!-- CONTACTO -->
+                            <div class="mb-3">
+                                <label class="form-label">Contacto responsable (nombre y teléfono)</label>
+                                <InputTextArea class="form-control"
+                                               @bind-Value="Modelo.Contacto"
+                                               rows="2"
+                                               placeholder="Nombre y teléfono"
+                                               maxlength="200" />
+                                <ValidationMessage For="@(() => Modelo.Contacto)" />
+                            </div>
+
+                            <!-- NOTAS -->
+                            <div class="mb-3">
+                                <label class="form-label">Notas (no incluir contraseñas)</label>
+                                <InputTextArea class="form-control"
+                                               @bind-Value="Modelo.Notas"
+                                               rows="2"
+                                               placeholder="Observaciones (no incluir contraseñas)"
+                                               maxlength="1000" />
+                            </div>
+
+                            <!-- CONSENTIMIENTO -->
+                            <div class="form-check mb-3">
+                                <InputCheckbox class="form-check-input" @bind-Value="Modelo.AceptaPrivacidad" />
+                                <label class="form-check-label ms-1">
+                                    Acepto el uso de esta información para elaborar la propuesta. No enviaré contraseñas por este medio.
+                                </label>
+                                <ValidationMessage For="@(() => Modelo.AceptaPrivacidad)" />
+                            </div>
+
+                            <!-- BOTÓN -->
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" disabled="@(Enviando)">
+                                    @if (Enviando)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <span>Enviando…</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Enviar</span>
+                                    }
+                                </button>
+                            </div>
+                        </EditForm>
+
+                        @if (ErrorMsg is not null)
+                        {
+                            <div class="alert alert-danger mt-3">@ErrorMsg</div>
+                        }
+                        @if (EnviadoOk)
+                        {
+                            <div class="alert alert-success mt-3 mb-0">
+                                ¡Enviado! Revisaremos tu información.
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (EntidadSlug == "sa")
+            {
+                <SAForm />
+            }
+            else
+            {
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="mb-2">Formulario para: @EntidadSlug?.ToUpper()</h5>
+                        <p class="text-muted mb-3">
+                            Esta sección se habilitará pronto. Mientras tanto,
+                            <a href="/conocimiento-cliente?entidad=ph">usa el formulario de PH</a>.
+                        </p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

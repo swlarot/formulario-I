@@ -1,0 +1,206 @@
+﻿@* Components/SAForm.razor *@
+@namespace formulario_I.Components
+@using FormularioL.Models
+@using FormularioL.Services
+@inject IEmailService EmailSvc
+
+@code {
+    private SaFormModel Modelo = new();
+    private bool Enviando;
+    private bool EnviadoOk;
+    private string? ErrorMsg;
+
+    private async Task Enviar()
+    {
+        try
+        {
+            Enviando = true; ErrorMsg = null; EnviadoOk = false;
+
+            // Honeypot
+            if (!string.IsNullOrWhiteSpace(Modelo.CodigoInterno))
+            {
+                EnviadoOk = true;
+                return;
+            }
+
+            // Consentimiento obligatorio
+            if (!Modelo.AceptaPrivacidad)
+            {
+                ErrorMsg = "Debe aceptar el aviso de confidencialidad para continuar.";
+                return;
+            }
+
+            await EmailSvc.SendSaAsync(Modelo);
+            EnviadoOk = true;
+            Modelo = new(); // limpiar
+        }
+        catch (Exception ex)
+        {
+            ErrorMsg = $"No pudimos enviar el formulario. Detalle: {ex.Message}";
+            Console.Error.WriteLine(ex);
+        }
+        finally
+        {
+            Enviando = false;
+            StateHasChanged();
+        }
+    }
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Conocimiento del Cliente — Sociedad Anónima (SA)</h5>
+    </div>
+
+    <div class="card-body">
+        <!-- .NET 9: Method="post", FormName y AntiforgeryToken con el mismo nombre -->
+        <EditForm Model="@Modelo" OnValidSubmit="Enviar" Method="post" FormName="kyc-sa">
+            <AntiforgeryToken FormName="kyc-sa" />
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <!-- Honeypot anti-bot -->
+            <input style="display:none" tabindex="-1" aria-hidden="true" autocomplete="off" @bind="Modelo.CodigoInterno" />
+
+            <!-- COMUNES -->
+            <div class="mb-3">
+                <label class="form-label">Razón social</label>
+                <InputText class="form-control" @bind-Value="Modelo.RazonSocial" maxlength="120" />
+                <ValidationMessage For="@(() => Modelo.RazonSocial)" />
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">RUC</label>
+                    <InputText class="form-control" @bind-Value="Modelo.RUC" maxlength="30" />
+                    <ValidationMessage For="@(() => Modelo.RUC)" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">DV</label>
+                    <InputText class="form-control" @bind-Value="Modelo.DV" maxlength="10" />
+                    <ValidationMessage For="@(() => Modelo.DV)" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Correo para envío de propuesta</label>
+                <InputText type="email" class="form-control" @bind-Value="Modelo.CorreoPropuesta" />
+                <ValidationMessage For="@(() => Modelo.CorreoPropuesta)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Dirección</label>
+                <InputTextArea class="form-control" @bind-Value="Modelo.Direccion" rows="2" maxlength="300" />
+                <ValidationMessage For="@(() => Modelo.Direccion)" />
+            </div>
+
+            <!-- ESPECÍFICOS SA -->
+            <div class="mb-3">
+                <label class="form-label">Actividad económica (descripción/CIIU)</label>
+                <InputText class="form-control" @bind-Value="Modelo.ActividadEconomica" maxlength="200" />
+                <ValidationMessage For="@(() => Modelo.ActividadEconomica)" />
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Año de constitución</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.AnioConstitucion" />
+                    <ValidationMessage For="@(() => Modelo.AnioConstitucion)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Capital social (USD)</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.CapitalSocial" step="0.01" />
+                    <ValidationMessage For="@(() => Modelo.CapitalSocial)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Facturación mensual promedio (USD)</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.FacturacionMensualPromedio" step="0.01" />
+                    <ValidationMessage For="@(() => Modelo.FacturacionMensualPromedio)" />
+                </div>
+            </div>
+
+            <div class="row g-3 mt-0">
+                <div class="col-md-4">
+                    <label class="form-label">N.º de accionistas</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.NumeroAccionistas" />
+                    <ValidationMessage For="@(() => Modelo.NumeroAccionistas)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Miembros junta/directores</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.MiembrosJunta" />
+                    <ValidationMessage For="@(() => Modelo.MiembrosJunta)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Empleados de planilla</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.EmpleadosPlanilla" />
+                    <ValidationMessage For="@(() => Modelo.EmpleadosPlanilla)" />
+                </div>
+            </div>
+
+            <div class="row g-3 mt-0">
+                <div class="col-md-6">
+                    <label class="form-label">N.º de cuentas bancarias</label>
+                    <InputNumber class="form-control" @bind-Value="Modelo.NumeroCuentasBancarias" />
+                    <ValidationMessage For="@(() => Modelo.NumeroCuentasBancarias)" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="Modelo.OperacionesExterior" />
+                        <label class="form-check-label ms-1">Operaciones exterior</label>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="Modelo.EEFFAuditados" />
+                        <label class="form-check-label ms-1">EEFF auditados</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 mt-2">
+                <label class="form-label">Sistema contable</label>
+                <InputText class="form-control" @bind-Value="Modelo.SistemaContable" maxlength="120" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Contacto responsable (nombre y teléfono)</label>
+                <InputTextArea class="form-control" @bind-Value="Modelo.Contacto" rows="2" maxlength="200" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Notas (no incluir contraseñas)</label>
+                <InputTextArea class="form-control" @bind-Value="Modelo.Notas" rows="2" maxlength="1000" />
+            </div>
+
+            <div class="form-check mb-3">
+                <InputCheckbox class="form-check-input" @bind-Value="Modelo.AceptaPrivacidad" />
+                <label class="form-check-label ms-1">
+                    Acepto el uso de esta información para elaborar la propuesta. No enviaré contraseñas por este medio.
+                </label>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg" disabled="@Enviando">
+                    @if (Enviando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Enviando...</span>
+                    }
+                    else
+                    {
+                        <span>Enviar</span>
+                    }
+                </button>
+            </div>
+        </EditForm>
+
+        @if (ErrorMsg is not null)
+        {
+            <div class="alert alert-danger mt-3">@ErrorMsg</div>
+        }
+        @if (EnviadoOk)
+        {
+            <div class="alert alert-success mt-3 mb-0">¡Enviado! Revisaremos tu información.</div>
+        }
+    </div>
+</div>
